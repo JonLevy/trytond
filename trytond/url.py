@@ -45,3 +45,12 @@ class URLAccessor(object):
 class URLMixin(object):
 
         __url__ = URLAccessor()
+
+        @property
+        def jsl_href(self):
+            return 'https://%s/#%s/model/%s/%s' % (
+                config.get('web', 'hostname'),
+                Transaction().database.name,
+                self.__name__,
+                self.id,
+            )
