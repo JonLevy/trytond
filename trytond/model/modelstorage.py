@@ -144,6 +144,16 @@ class ModelStorage(Model):
                     and field.left and field.right):
                 cls._mptt_fields.add(name)
 
+    @classmethod
+    def __post_setup__(cls):
+        super().__post_setup__()
+        cls._path_fields = set()
+        for name, field in cls._fields.items():
+            if (isinstance(field, fields.Many2One)
+                    and field.model_name == cls.__name__):
+                if field.path:
+                    cls._path_fields.add(name)
+
     @staticmethod
     def default_create_uid():
         "Default value for uid field."
