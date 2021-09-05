@@ -1400,7 +1400,7 @@ class ModelSQL(ModelStorage):
             where=Column(table, field_name) == Null)
         tree.query |= (table
             .join(tree,
-                conditions=Column(table, field_name) == tree.id)
+                condition=Column(table, field_name) == tree.id)
             .select(table.id, Concat(Concat(tree.path, table.id), '/')))
         query = table.update(
             [Column(table, field.path)],
