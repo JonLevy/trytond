@@ -20,7 +20,7 @@ from trytond.transaction import Transaction
 from trytond.exceptions import (
     UserError, UserWarning, ConcurrencyException, LoginException,
     RateLimitException)
-from trytond.tools import is_instance_method
+from trytond.tools import is_instance_method, resolve
 from trytond.wsgi import app
 from trytond.worker import run_task
 from .wrappers import with_pool
@@ -31,6 +31,14 @@ ir_configuration = Table('ir_configuration')
 ir_lang = Table('ir_lang')
 ir_module = Table('ir_module')
 res_user = Table('res_user')
+
+
+def make_context(request):
+    func = config.get('listen', 'make_context_function')
+    if func:
+        return resolve(func)(request)
+    else:
+        return request.context
 
 
 @app.route('/<string:database_name>/', methods=['POST'])
@@ -56,7 +64,7 @@ def login(request, database_name, user, parameters, language=None):
         abort(HTTPStatus.NOT_FOUND)
     context = {
         'language': language,
-        '_request': request.context,
+        '_request': make_context(request.context),
         }
     try:
         session = security.login(
@@ -75,7 +83,7 @@ def logout(request, database_name):
     auth = request.authorization
     security.logout(
         database_name, auth.get('userid'), auth.get('session'),
-        context={'_request': request.context})
+        context={'_request': make_context(request)})
 
 
 @app.route('/', methods=['POST'])
@@ -99,7 +107,7 @@ def db_exist(request, database_name):
 def db_list(request, *args):
     if not config.getboolean('database', 'list'):
         abort(HTTPStatus.FORBIDDEN)
-    context = {'_request': request.context}
+    context = {'_request': make_context(request.context)}
     hostname = get_hostname(request.host)
     with Transaction().start(
             None, 0, context=context, close=True, _nocache=True
@@ -150,7 +158,7 @@ def _dispatch(request, pool, *args, **kwargs):
         session = request.authorization.get('session')
 
     if rpc.fresh_session and session:
-        context = {'_request': request.context}
+        context = {'_request': make_context(request.context)}
         if not security.check_timeout(
                 pool.database_name, user, session, context=context):
             abort(http.client.UNAUTHORIZED)
@@ -169,7 +177,7 @@ def _dispatch(request, pool, *args, **kwargs):
             try:
                 c_args, c_kwargs, transaction.context, transaction.timestamp \
                     = rpc.convert(obj, *args, **kwargs)
-                transaction.context['_request'] = request.context
+                transaction.context['_request'] = make_context(request)
                 meth = getattr(obj, method)
                 if (rpc.instantiate is None
                         or not is_instance_method(obj, method)):
@@ -201,7 +209,7 @@ def _dispatch(request, pool, *args, **kwargs):
             task_id = transaction.tasks.pop()
             run_task(pool, task_id)
         if session:
-            context = {'_request': request.context}
+            context = {'_request': make_context(request)}
             security.reset(pool.database_name, session, context=context)
         logger.debug('Result: %s', result)
         return result
