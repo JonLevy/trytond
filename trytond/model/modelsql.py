@@ -1567,6 +1567,7 @@ class ModelSQL(ModelStorage):
         '''
         Rebuild left, right value for the tree.
         '''
+        return  # JSL Kill rebuilding for 5.2
         cursor = Transaction().connection.cursor()
         table = cls.__table__()
         right = left + 1
